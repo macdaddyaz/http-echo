@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
-	"github.com/hashicorp/http-echo/version"
+	"macdaddyaz/http-echo/version"
 )
 
 const (
@@ -70,8 +72,22 @@ func httpLog(out io.Writer, h http.HandlerFunc) http.HandlerFunc {
 				end.Format(httpLogDateFormat),
 				r.Host, r.RemoteAddr, r.Method, r.URL.Path, r.Proto,
 				status, length, r.UserAgent(), dur)
+			if r.Body != nil {
+				logBody(out, r.Body)
+			}
 		}(time.Now())
 
 		h(&mrw, r)
+	}
+}
+
+func logBody(out io.Writer, body io.Reader) {
+	buf := bufio.NewReader(body)
+	count, err := buf.WriteTo(out)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if count > 0 {
+		fmt.Fprintln(out)
 	}
 }
