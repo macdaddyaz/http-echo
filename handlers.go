@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"time"
@@ -58,7 +59,7 @@ func (w *metaResponseWriter) Write(b []byte) (int, error) {
 
 // httpLog accepts an io object and logs the request and response objects to the
 // given io.Writer.
-func httpLog(out io.Writer, h http.HandlerFunc) http.HandlerFunc {
+func httpLog(out io.Writer, h http.HandlerFunc, stream bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var mrw metaResponseWriter
 		mrw.writer = w
@@ -73,7 +74,11 @@ func httpLog(out io.Writer, h http.HandlerFunc) http.HandlerFunc {
 				r.Host, r.RemoteAddr, r.Method, r.URL.Path, r.Proto,
 				status, length, r.UserAgent(), dur)
 			if r.Body != nil {
-				logBody(out, r.Body)
+				if stream {
+					logBody(out, r.Body)
+				} else {
+					logBodyMem(out, r.Body)
+				}
 			}
 		}(time.Now())
 
@@ -84,6 +89,21 @@ func httpLog(out io.Writer, h http.HandlerFunc) http.HandlerFunc {
 func logBody(out io.Writer, body io.Reader) {
 	buf := bufio.NewReader(body)
 	count, err := buf.WriteTo(out)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if count > 0 {
+		fmt.Fprintln(out)
+	}
+}
+
+func logBodyMem(out io.Writer, body io.Reader) {
+	data, err := ioutil.ReadAll(body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	buf := bufio.NewWriter(out)
+	count, err := buf.Write(data)
 	if err != nil {
 		log.Fatal(err)
 	}
